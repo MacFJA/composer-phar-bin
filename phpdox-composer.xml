@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<phpdox xmlns="http://xml.phpdox.net/config" silent="false">
+    <bootstrap/>
+
+    <project name="Composer Phar Bin plugin" source="${basedir}/vendor/composer/composer" workdir="${basedir}/build/phpdox/composer/xml">
+        <!--  Additional configuration for the collecting process (parsing of php code, generation of xml data) -->
+        <collector publiconly="true" backend="parser" encoding="auto">
+
+            <!--  <include / exclude filter for filelist generator, mask must follow fnmatch() requirements  -->
+            <!--  Multiple elements can be added to define more than one mask per filter -->
+            <include mask="*.php"/>
+            <exclude mask=""/>
+
+            <!--  How to handle inheritance -->
+            <inheritance resolve="false"/>
+
+        </collector>
+
+        <!--  Configuration of generation process -->
+        <generator output="${basedir}/build/phpdox/composer">
+            <build engine="xml" enabled="true" output="" />
+
+        </generator>
+    </project>
+
+</phpdox>

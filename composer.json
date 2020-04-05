@@ -1,0 +1,51 @@
+{
+    "name": "macfja/composer-phar-bin",
+    "type": "composer-plugin",
+    "description": "Composer plugin to replace dev dependencies by Phar",
+    "keywords": [
+        "composer",
+        "plugin",
+        "phar",
+        "phive",
+        "phar-io"
+    ],
+    "readme": "README.md",
+    "license": "MIT",
+    "require": {
+        "php": "^7.1",
+        "ext-simplexml": "*",
+        "composer-plugin-api": "^1.0",
+        "symfony/process": ">= 3",
+        "webmozart/path-util": "^2.1"
+    },
+    "require-dev": {
+        "composer/composer": "^1.10",
+        "ergebnis/composer-normalize": "*",
+        "friendsofphp/php-cs-fixer": "^2.16",
+        "jakub-onderka/php-parallel-lint": "^1.0",
+        "pdepend/pdepend": "^2.5.0",
+        "phan/phan": "^1.1.10 || ^2",
+        "phploc/phploc": ">= 2",
+        "phpmd/phpmd": "^2.2.3",
+        "phpstan/phpstan": "^0.10",
+        "rskuipers/php-assumptions": "^0.8.0",
+        "sebastian/phpcpd": "^5.0.1",
+        "theseer/phpdox": "^0.12.0",
+        "vimeo/psalm": "^3.9"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "class": "MacFJA\\ComposerPharBin\\Plugin"
+    },
+    "autoload": {
+        "psr-4": {
+            "MacFJA\\ComposerPharBin\\": "src/"
+        }
+    },
+    "support": {
+        "issues": "https://github.com/MacFJA/composer-phar-bin/issues",
+        "source": "https://github.com/MacFJA/composer-phar-bin/"
+    }
+}
