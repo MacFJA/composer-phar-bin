@@ -19,16 +19,18 @@
 
 namespace MacFJA\ComposerPharBin;
 
-use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Process\Process;
 use function array_merge;
-use Composer\Composer;
+use function class_exists;
 use Composer\IO\IOInterface;
 use function count;
+use function file_exists;
 use function file_get_contents;
+use function is_file;
+use RuntimeException;
 use function simplexml_load_string;
-use function str_replace;
+use function sprintf;
 use Symfony\Component\Process\PhpExecutableFinder;
+use Symfony\Component\Process\Process;
 use Symfony\Component\Process\ProcessBuilder;
 use function trim;
 use Webmozart\PathUtil\Path;
@@ -45,47 +47,27 @@ class PhiveRunner
      *
      * @param array<string> $packages
      */
-    public function install(Composer $composer, IOInterface $inputOutput, array $packages): bool
+    public function install(Configuration $configuration, IOInterface $inputOutput, array $packages): bool
     {
         if (0 === count($packages)) {
             return true;
         }
 
-        $binDir = (string) $composer->getConfig()->get('bin-dir');
-
         $parameters = [
             'install',
-            '--target',$binDir,
-            '--temporary',
-            '--force-accept-unsigned'
+            '--target', $configuration->getBinaryDirectory(),
+            '--force-accept-unsigned',
         ];
+
+        if ($configuration->isTemporaryInstallation()) {
+            $parameters[] = '--temporary';
+        }
 
         foreach ($packages as $package) {
             $parameters[] = $package;
         }
 
-        $process = $this->getBaseProcess($parameters);
-        $process->setTty(true);
-        $exitCode = $process->run();
-
-        if (!$process->isSuccessful()) {
-            $inputOutput->writeError('<error>'.trim($process->getErrorOutput()).'</error>');
-
-            throw new \RuntimeException(sprintf('Phar installation exit with the code %d', $exitCode));
-        }
-
-        return true;
-    }
-
-    /**
-     * Get the version of the Phive binary.
-     */
-    public function version(): string
-    {
-        $process = $this->getBaseProcess(['version']);
-        $process->run();
-
-        return trim($process->getOutput());
+        return $this->runCommand($inputOutput, 'Phar installation exit with the code %d', $parameters);
     }
 
     /**
@@ -101,7 +83,41 @@ class PhiveRunner
         return $aliases;
     }
 
-    private function getBaseProcess(array $arguments= []): Process
+    /**
+     * Run the remove command of the Phive binary.
+     */
+    public function remove(IOInterface $inputOutput, string $alias): bool
+    {
+        $parameters = [
+            'remove',
+            $alias,
+        ];
+
+        return $this->runCommand($inputOutput, 'Phar removal exit with the code %d', $parameters);
+    }
+
+    /**
+     * @param array<string> $parameters
+     */
+    private function runCommand(IOInterface $inputOutput, string $exceptionMessage, array $parameters = []): bool
+    {
+        $process = $this->getBaseProcess($parameters);
+        $process->setTty(true);
+        $exitCode = $process->run();
+
+        if (!$process->isSuccessful()) {
+            $inputOutput->writeError('<error>'.trim($process->getErrorOutput()).'</error>');
+
+            throw new RuntimeException(sprintf($exceptionMessage, $exitCode));
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string> $arguments
+     */
+    private function getBaseProcess(array $arguments = []): Process
     {
         $composerPackage = new PhivePackage();
 
@@ -117,11 +133,32 @@ class PhiveRunner
         return new Process($commandParts);
     }
 
+    /**
+     * @return array<string,string>
+     */
     private function extractAlias(string $fromPath): array
     {
-        $xml = simplexml_load_string(file_get_contents($fromPath));
+        if (!file_exists($fromPath) || !is_file($fromPath)) {
+            return [];
+        }
+        $rawContent = file_get_contents($fromPath);
+
+        if (false === $rawContent) {
+            return [];
+        }
+
+        $xml = simplexml_load_string($rawContent);
+
+        if (false === $xml) {
+            return [];
+        }
 
         $nodes = $xml->xpath('//*[local-name()="phar"]');
+
+        if (false === $nodes) {
+            return [];
+        }
+
         $result = [];
         foreach ($nodes as $node) {
             $result[(string) $node['alias']] = (string) $node['composer'];

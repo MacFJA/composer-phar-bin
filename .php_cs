@@ -171,7 +171,7 @@ return PhpCsFixer\Config::create()
         // Adds or removes `?` before type declarations for parameters with a default `null` value.
         'nullable_type_declaration_for_default_null_value' => true,
         // A return statement wishing to return `void` should not return `null`.
-        'simplified_null_return' => true,
+        'simplified_null_return' => false,
         // Use `null` coalescing operator `??` where possible. Requires PHP >= 7.0.
         'ternary_to_null_coalescing' => true,
         // Changes doc blocks from single to multi line, or reversed. Works for class constants, properties and methods only.

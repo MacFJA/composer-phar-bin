@@ -21,26 +21,49 @@ namespace MacFJA\ComposerPharBin;
 
 use function array_search;
 use Composer\Composer;
+use Composer\DependencyResolver\Operation\UninstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
+use Composer\Installer\PackageEvent;
+use Composer\Installer\PackageEvents;
 use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
-use function in_array;
+use function file_exists;
+use function is_file;
 use function is_string;
+use function unlink;
+use Webmozart\PathUtil\Path;
 
 /**
  * Entry point of the Composer plugin.
  *
  * @suppress PhanUnreferencedClass
+ * @psalm-suppress UnusedClass
  *
  * @author MacFJA
  */
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
+    /** @var PhiveRunner */
+    private $runner;
+
+    /** @var Configuration */
+    private $configuration;
+
+    /**
+     * Plugin constructor.
+     */
+    public function __construct()
+    {
+        $this->runner = new PhiveRunner();
+        $this->configuration = new Configuration();
+    }
+
     public function activate(Composer $composer, IOInterface $inputOutput): void
     {
         (new PhiveDownloader($composer, $inputOutput))->install();
+        $this->configuration->setComposer($composer);
     }
 
     public static function getSubscribedEvents()
@@ -48,6 +71,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         return [
             ScriptEvents::PRE_INSTALL_CMD => 'onPreInstall',
             ScriptEvents::PRE_UPDATE_CMD => 'onPreInstall',
+            PackageEvents::POST_PACKAGE_UNINSTALL => 'onPackageRemoval',
         ];
     }
 
@@ -61,12 +85,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $packages = $event->getComposer()->getPackage()->getDevRequires();
         $replaces = $event->getComposer()->getPackage()->getReplaces();
 
-        $phiveRunner = new PhiveRunner();
-
         $toDownload = [];
 
         foreach ($packages as $package) {
-            if ($this->isExclude($package->getTarget(), $event->getComposer())) {
+            if ($this->configuration->isExclude($package->getTarget())) {
                 continue;
             }
 
@@ -81,7 +103,35 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $event->getComposer()->getPackage()->setReplaces($replaces);
 
         $event->getIO()->write('<info>Installing PHARs</info>');
-        $phiveRunner->install($event->getComposer(), $event->getIO(), $toDownload);
+        $this->runner->install($this->configuration, $event->getIO(), $toDownload);
+    }
+
+    /**
+     * Remove binary on package removal.
+     *
+     * @suppress PhanUnreferencedPublicMethod
+     */
+    public function onPackageRemoval(PackageEvent $event): void
+    {
+        $operation = $event->getOperation();
+        if (!($operation instanceof UninstallOperation)) {
+            return;
+        }
+        $package = $operation->getPackage();
+
+        if ($this->configuration->isExclude($package->getName())) {
+            return;
+        }
+        $alias = $this->getPackageAlias($package->getName());
+
+        if (is_string($alias)) {
+            if ($this->configuration->isTemporaryInstallation()) {
+                $this->removeAliasFile($event->getIO(), $alias);
+
+                return;
+            }
+            $this->runner->remove($event->getIO(), $alias);
+        }
     }
 
     /**
@@ -98,13 +148,16 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         return is_string($key) ? $key : null;
     }
 
-    /**
-     * Lookup at the composer package that must not be replaced.
-     */
-    protected function isExclude(string $package, Composer $composer): bool
+    private function removeAliasFile(IOInterface $inputOutput, string $alias): void
     {
-        $exclude = (array) ($composer->getPackage()->getExtra()['composer-phar-bin']['exclude'] ?? []);
+        $path = Path::canonicalize($this->configuration->getBinaryDirectory().'/'.$alias);
 
-        return in_array($package, $exclude, true);
+        if (!file_exists($path) || !is_file($path)) {
+            $inputOutput->writeError('<warning>No file to remove</warning>');
+
+            return;
+        }
+
+        unlink($path);
     }
 }

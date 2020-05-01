@@ -15,8 +15,8 @@ analyze: | vendor
 	$(COMPOSER) exec -v phpmd -- src text phpmd.xml
 	$(COMPOSER) exec -v phpa -- src
 	$(COMPOSER) exec -v phan -- --allow-polyfill-parser --directory src --unused-variable-detection --dead-code-detection --target-php-version 7.2
-	$(COMPOSER) exec -v phpstan -- analyse src
-	$(COMPOSER) exec -v psalm -- --show-info=true src
+	$(COMPOSER) exec -v phpstan -- analyse --level=7 src
+	$(COMPOSER) exec -v psalm -- --stats --long-progress --find-dead-code=always --show-snippet=true --find-unused-code=always --show-info=true
 
 docs: | vendor
 	[ -d build ] || mkdir build
